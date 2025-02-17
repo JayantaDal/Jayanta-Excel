@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Excel Clone with Formula Support</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <style>
+        body { font-family: Arial, sans-serif; text-align: center; background: #f5f5f5; margin: 20px; }
+        table { width: 80%; border-collapse: collapse; margin: 20px auto; background: white; }
+        th, td { border: 1px solid #000; padding: 8px; text-align: center; min-width: 80px; }
+        input { border: none; width: 100%; text-align: center; font-size: 14px; }
+        input:focus { outline: none; background: #eef; }
+        .controls button { padding: 10px; margin: 5px; border: none; cursor: pointer; background: #007bff; color: white; border-radius: 5px; }
+        .controls button:hover { background: #0056b3; }
+        .toolbar { margin: 10px; }
+        .toolbar button, .toolbar select { padding: 8px; margin: 5px; }
+    </style>
+</head>
+<body>
+
+    <h2>Advanced Excel Clone</h2>
+
+    <div class="toolbar">
+        <button onclick="setStyle('bold')">Bold</button>
+        <button onclick="setStyle('italic')">Italic</button>
+        <input type="color" id="colorPicker" onchange="setColor(this.value)">
+        <button onclick="autoSum()">AutoSum</button>
+    </div>
+
+    <div class="controls">
+        <button onclick="addRow()">➕ Add Row</button>
+        <button onclick="addColumn()">➕ Add Column</button>
+        <button onclick="deleteRow()">🗑️ Delete Row</button>
+        <button onclick="deleteColumn()">🗑️ Delete Column</button>
+        <button onclick="exportToPDF('portrait')">📄 Save as PDF (Portrait)</button>
+        <button onclick="exportToPDF('landscape')">📄 Save as PDF (Landscape)</button>
+        <button onclick="printTable()">🖨️ Print</button>
+    </div>
+
+    <table id="excelTable">
+        <tbody>
+            <tr>
+                <td><input type="text" oninput="calculateFormula(this)"></td>
+                <td><input type="text" oninput="calculateFormula(this)"></td>
+                <td><input type="text" oninput="calculateFormula(this)"></td>
+            </tr>
+        </tbody>
+    </table>
+
+    <script>
+        function addRow() {
+            let table = document.getElementById("excelTable").getElementsByTagName('tbody')[0];
+            let newRow = table.insertRow();
+            let colCount = document.getElementById("excelTable").rows[0].cells.length;
+            
+            for (let i = 0; i < colCount; i++) {
+                let newCell = newRow.insertCell(i);
+                newCell.innerHTML = '<input type="text" oninput="calculateFormula(this)">';
+            }
+        }
+
+        function addColumn() {
+            let table = document.getElementById("excelTable");
+            let rows = table.getElementsByTagName('tbody')[0].rows;
+
+            for (let row of rows) {
+                let newCell = row.insertCell(-1);
+                newCell.innerHTML = '<input type="text" oninput="calculateFormula(this)">';
+            }
+        }
+
+        function deleteRow() {
+            let table = document.getElementById("excelTable").getElementsByTagName('tbody')[0];
+            if (table.rows.length > 1) {
+                table.deleteRow(-1);
+            } else {
+                alert("At least one row must be present!");
+            }
+        }
+
+        function deleteColumn() {
+            let table = document.getElementById("excelTable");
+            let rows = table.getElementsByTagName('tbody')[0].rows;
+            let colCount = rows[0].cells.length;
+
+            if (colCount > 1) {
+                for (let row of rows) {
+                    row.deleteCell(-1);
+                }
+            } else {
+                alert("At least one column must be present!");
+            }
+        }
+
+        function setStyle(style) {
+            let inputs = document.querySelectorAll("input:focus");
+            if (inputs.length > 0) {
+                if (style === "bold") {
+                    inputs[0].style.fontWeight = inputs[0].style.fontWeight === "bold" ? "normal" : "bold";
+                } else if (style === "italic") {
+                    inputs[0].style.fontStyle = inputs[0].style.fontStyle === "italic" ? "normal" : "italic";
+                }
+            }
+        }
+
+        function setColor(color) {
+            let inputs = document.querySelectorAll("input:focus");
+            if (inputs.length > 0) {
+                inputs[0].style.color = color;
+            }
+        }
+
+        function autoSum() {
+            let inputs = document.querySelectorAll("input:focus");
+            if (inputs.length > 0) {
+                let row = inputs[0].parentElement.parentElement;
+                let sum = 0;
+
+                for (let cell of row.cells) {
+                    let val = cell.children[0].value;
+                    sum += isNaN(parseFloat(val)) ? 0 : parseFloat(val);
+                }
+
+                inputs[0].value = sum;
+            }
+        }
+
+        function calculateFormula(input) {
+            let value = input.value;
+            if (value.startsWith("=")) {
+                try {
+                    let formula = value.substring(1);
+                    input.value = eval(formula);
+                } catch (e) {
+                    input.value = "Error";
+                }
+            }
+        }
+
+        function exportToPDF(orientation) {
+            const { jsPDF } = window.jspdf;
+            let doc = new jsPDF({ orientation: orientation });
+
+            let table = document.getElementById("excelTable");
+
+            html2canvas(table).then(canvas => {
+                let imgData = canvas.toDataURL("image/png");
+                let imgWidth = 210; // A4 width
+                let imgHeight = (canvas.height * imgWidth) / canvas.width;
+
+                if (orientation === "landscape") {
+                    imgWidth = 297;
+                    imgHeight = (canvas.height * imgWidth) / canvas.width;
+                }
+
+                doc.addImage(imgData, "PNG", 10, 10, imgWidth - 20, imgHeight);
+                doc.save("Excel_Sheet.pdf");
+            });
+        }
+
+        function printTable() {
+            let table = document.getElementById("excelTable").outerHTML;
+            let newWin = window.open("", "", "width=800,height=600");
+            newWin.document.write("<html><head><title>Print</title></head><body>");
+            newWin.document.write("<h2>Excel Sheet</h2>");
+            newWin.document.write(table);
+            newWin.document.write("</body></html>");
+            newWin.document.close();
+            newWin.print();
+        }
+    </script>
+
+</body>
+</html>
